@@ -1,7 +1,6 @@
 extern crate enum_map;
 
 use enum_map as EM;
-use std::cmp::Ordering;
 use std::ops::{Add, Index, Mul};
 
 #[derive(Copy, Clone, Debug, EM::Enum)]
@@ -20,7 +19,6 @@ pub enum Gas {
     PlOx,
 }
 impl Gas {
-    #[inline]
     fn heat_cap_of(self) -> f64 {
         match self {
             Gas::N2 => 20.,
@@ -38,7 +36,6 @@ impl Gas {
         }
     }
 
-    #[inline]
     fn fusion_power_of(self) -> f64 {
         match self {
             Gas::N2O => 10.,
@@ -54,11 +51,10 @@ impl Gas {
 }
 pub type GasEnumMap = EM::EnumMap<Gas, f64>;
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug)]
 pub struct GasVec(pub GasEnumMap);
 
 impl GasVec {
-    #[inline]
     pub fn get_heat_cap(&self) -> f64 {
         self.0
             .iter()
@@ -66,7 +62,6 @@ impl GasVec {
             .sum::<f64>()
     }
 
-    #[inline]
     pub fn get_fusion_power(&self) -> f64 {
         self.0
             .iter()
@@ -95,20 +90,5 @@ impl Index<Gas> for GasVec {
 
     fn index(&self, gas: Gas) -> &f64 {
         &self.0[gas]
-    }
-}
-
-impl PartialEq<GasEnumMap> for GasVec {
-    fn eq(&self, rhs: &GasEnumMap) -> bool {
-        self.0.iter().all(|(g, a)| a == &rhs[g])
-    }
-}
-
-impl PartialOrd<GasEnumMap> for GasVec {
-    fn partial_cmp(&self, rhs: &GasEnumMap) -> Option<Ordering> {
-        Option::from(match self.0.iter().all(|(g, a)| a > &rhs[g]) {
-            true => Ordering::Greater,
-            false => Ordering::Less,
-        })
     }
 }

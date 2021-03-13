@@ -1,69 +1,7 @@
-#![macro_use]
 extern crate enum_map;
 
 use crate::gas::*;
 use std::ops::{Add, Index};
-
-#[macro_export]
-macro_rules! gen_gas_vec (
-    ($($t:tt)*) => {
-        GasVec(enum_map!{
-            $($t)*
-            _ => 0.0
-        })
-    }
-);
-
-#[macro_export]
-macro_rules! gen_free_gas_mix(
-    (
-        with($($t:tt)*)
-        at($temp:expr)$unit:ident
-    ) => {
-        gen_gas_mix!(
-            with($($t)*)
-            at($temp)$unit
-            in(0.0) L
-        )
-    }
-);
-
-#[macro_export]
-macro_rules! gen_gas_mix(
-    (
-        with($($t:tt)*)
-        at($temp:expr) K
-        in($volume:expr) L
-    ) => {
-        GasMixture {
-            gases: gen_gas_vec!($($t)*),
-            temperature: $temp,
-            volume: $volume
-        }
-    };
-    (
-        with($($t:tt)*)
-        at($temp:expr) C
-        in($volume:expr) L
-    ) => {
-        gen_gas_mix! {
-            with($($t)*)
-            at($crate::constants::T0C + $temp) K
-            in($volume) L
-        }
-    };
-    (
-        with($($t:tt)*)
-        at($energy:expr) J
-        in($volume:expr) L
-    ) => {
-        GasMixture::with_energy(
-            gen_gas_vec!($($t)*),
-            $energy,
-            $volume
-        )
-    };
-);
 
 #[derive(Copy, Clone, Debug)]
 pub struct GasMixture {
@@ -73,26 +11,22 @@ pub struct GasMixture {
 }
 
 impl GasMixture {
-    #[inline]
     pub fn get_heat_cap(&self) -> f64 {
         self.gases.get_heat_cap()
     }
 
-    #[inline]
     pub fn get_fusion_power(&self) -> f64 {
         self.gases.get_fusion_power()
     }
 
-    #[inline]
     pub fn get_energy(&self) -> f64 {
         self.get_heat_cap() * self.temperature
     }
 
     pub fn adjust_thermal_energy(&self, energy: f64) -> Self {
         Self {
-            gases: self.gases,
             temperature: (self.get_energy() + energy) / self.get_heat_cap(),
-            volume: self.volume,
+            ..*self
         }
     }
 
