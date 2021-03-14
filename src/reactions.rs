@@ -1,13 +1,33 @@
-#![allow(dead_code)]
-
 use crate::constants as C;
 use crate::enum_map;
 use crate::gas::*;
-use crate::{chained_call, gas_mixture::*, gen_gas_mix, reaction, temperature};
+use crate::{chained_call, gas_mixture::*, gen_gas_mix_with_energy, reaction, temperature};
 
 fn verify_hnob(gm: &GasMixture) -> bool {
     gm[Gas::HNb] < 5.0
 }
+
+reaction! (
+    called(n2o_decomp)
+    with(
+        Gas::N2O => C::MINIMUM_MOLE_COUNT
+    )
+    at(temperature!(C::N2O_DECOMPOSITION_MIN_ENERGY, K))
+    with_gm_as(gm) => {
+        let n2o = gm[Gas::N2O];
+        let t = gm.temperature;
+        let burned_fuel = (2e-5 * (t - (1e-5 * t.powi(2)))).max(0.) * n2o;
+
+        gm + gen_gas_mix_with_energy!(
+            with (
+                Gas::N2O => -burned_fuel,
+                Gas::O2 => burned_fuel / 2.,
+                Gas::N2 => burned_fuel,
+            )
+            at (C::N2O_DECOMPOSITION_ENERGY_RELEASED * burned_fuel)
+        )
+    }
+);
 
 reaction! (
     called(plasma_fire)
@@ -15,7 +35,7 @@ reaction! (
         Gas::Pl => C::MINIMUM_MOLE_COUNT,
         Gas::O2 => C::MINIMUM_MOLE_COUNT
     )
-    at(temperature!(C::PLASMA_MINIMUM_BURN_TEMPERATURE, Kelvin))
+    at(temperature!(C::PLASMA_MINIMUM_BURN_TEMPERATURE, K))
     with_gm_as(gm) => {
         let pl = gm[Gas::Pl];
         let o2 = gm[Gas::O2];
@@ -40,14 +60,14 @@ reaction! (
         let is_satured = o2 / pl > C::SUPER_SATURATION_THRESHOLD;
         let energy_release = plasma_burn_rate * C::FIRE_PLASMA_ENERGY_RELEASED;
 
-        gm + gen_gas_mix!(
-            with(
+        gm + gen_gas_mix_with_energy!(
+            with (
                 Gas::Pl => -plasma_burn_rate,
                 Gas::O2 => -plasma_burn_rate * oxygen_burn_rate,
                 Gas::H2 if is_satured => plasma_burn_rate,
                 Gas::CO2 if !is_satured => plasma_burn_rate,
             )
-            at(energy_release) J
+            at (energy_release)
         )
     }
 );
@@ -58,7 +78,7 @@ reaction! (
         Gas::H2 => C::MINIMUM_MOLE_COUNT,
         Gas::O2 => C::MINIMUM_MOLE_COUNT
     )
-    at(temperature!(100.0, Celcius))
+    at(temperature!(100.0, C))
     with_gm_as(gm) => {
         let e = gm.get_energy();
         let h2 = gm[Gas::H2];
@@ -70,14 +90,14 @@ reaction! (
         let extra_energy_release = if !o2_no_combust {primary_energy_release * (C::TRITIUM_BURN_TRIT_FACTOR - 1.)} else {0.};
         let energy_release = extra_energy_release + primary_energy_release;
 
-        gm + gen_gas_mix!(
+        gm + gen_gas_mix_with_energy!(
             with(
                 Gas::H2O => burned_fuel,
                 Gas::H2 if o2_no_combust => -burned_fuel,
                 Gas::H2 if !o2_no_combust => -burned_fuel / C::TRITIUM_BURN_TRIT_FACTOR,
                 Gas::O2 if !o2_no_combust => -h2 * (1. - 1. / C::TRITIUM_BURN_TRIT_FACTOR),
             )
-            at(energy_release) J
+            at (energy_release)
         )
     }
 );
@@ -89,7 +109,7 @@ reaction! (
         Gas::Pl => C::FUSION_MOLE_THRESHOLD,
         Gas::CO2 => C::FUSION_MOLE_THRESHOLD
     )
-    at(temperature!(C::FUSION_TEMPERATURE_THRESHOLD, Kelvin))
+    at(temperature!(C::FUSION_TEMPERATURE_THRESHOLD, K))
     with_gm_as(gm) => {
         let pl = gm[Gas::Pl];
         let co2 = gm[Gas::CO2];
@@ -148,13 +168,79 @@ reaction! (
     }
 );
 
+reaction! (
+    called(nitryl_formation)
+    with(
+        Gas::N2 => 20.,
+        Gas::O2 => 20.,
+        Gas::PlOx => 5.
+    )
+    at(temperature!(C::FIRE_MINIMUM_TEMPERATURE_TO_EXIST * 60., K))
+    with_gm_as(gm) => {
+        let n2 = gm[Gas::N2];
+        let o2 = gm[Gas::O2];
+        let t = gm.temperature;
+
+        let heat_eff = (t / C::FIRE_MINIMUM_TEMPERATURE_TO_EXIST / 60.).min(n2).min(o2);
+        let energy_use = heat_eff * C::NITRYL_FORMATION_ENERGY;
+
+        gm + gen_gas_mix_with_energy!(
+            with(
+                Gas::N2 => -heat_eff,
+                Gas::O2 => -heat_eff,
+                Gas::N2O => 2. * heat_eff,
+            )
+            at(-energy_use)
+        )
+    }
+);
+
+reaction! (
+    called(bz_synth)
+    with(
+        Gas::N2O => 10.,
+        Gas::Pl => 10.
+    )
+    at(f64::NEG_INFINITY)
+    with_gm_as(gm) => {
+        let p = gm.get_pressure();
+        let pl = gm[Gas::Pl];
+        let n2o = gm[Gas::N2O];
+
+        let half_atm_pressure = 2. * p / C::ONE_ATMOSPHERE;
+        let efficiency = (half_atm_pressure * (pl / n2o).max(1.)).powi(-1);
+        let usage = efficiency
+            .min(n2o)
+            .min(pl / 2.);
+
+        let is_balanced = usage == n2o;
+
+        let energy_release = 2. * usage * C::FIRE_CARBON_ENERGY_RELEASED;
+
+        let bz_prod = usage - p.max(1.);
+
+        gm + gen_gas_mix_with_energy!(
+            with(
+                Gas::N2O => -usage,
+                Gas::Pl => -2. * usage,
+                Gas::BZ if is_balanced => bz_prod,
+                Gas::O2 if is_balanced => p.max(1.),
+            )
+            at (energy_release)
+        )
+    }
+);
+
 pub fn react(gm: GasMixture) -> GasMixture {
     if verify_hnob(&gm) {
         chained_call! (
             gm =>
+            n2o_decomp =>
             trit_fire =>
             plasma_fire =>
-            fusion
+            fusion =>
+            nitryl_formation =>
+            bz_synth
         )
     } else {
         gm

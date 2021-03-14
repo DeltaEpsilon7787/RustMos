@@ -68,6 +68,12 @@ impl GasVec {
             .map(|(g, a)| a * Gas::fusion_power_of(g))
             .sum::<f64>()
     }
+
+    pub fn get_total_amount(&self) -> f64 {
+        self.0
+            .values()
+            .sum()
+    }
 }
 
 impl Add<GasVec> for GasVec {

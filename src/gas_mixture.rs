@@ -1,6 +1,7 @@
 extern crate enum_map;
 
 use crate::gas::*;
+use crate::constants as C;
 use std::ops::{Add, Index};
 
 #[derive(Copy, Clone, Debug)]
@@ -21,6 +22,14 @@ impl GasMixture {
 
     pub fn get_energy(&self) -> f64 {
         self.get_heat_cap() * self.temperature
+    }
+
+    pub fn get_total_amount(&self) -> f64 {
+        self.gases.get_total_amount()
+    }
+
+    pub fn get_pressure(&self) -> f64 {
+        C::R_IDEAL_GAS_EQUATION * self.get_total_amount() * self.temperature / self.volume
     }
 
     pub fn adjust_thermal_energy(&self, energy: f64) -> Self {

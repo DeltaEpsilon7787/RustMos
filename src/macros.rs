@@ -1,51 +1,29 @@
 #[macro_export]
-macro_rules! gen_gas_vec (
+macro_rules! gen_gas_vec {
     ($($t:tt)*) => {
         $crate::GasVec($crate::enum_map!{
             $($t)*
             _ => 0.0
         })
     }
-);
+}
 
 #[macro_export]
-macro_rules! gen_gas_mix(
+macro_rules! gen_gas_mix_with_energy {
     (
-        with($($t:tt)*)
-        at($temp:expr)$unit:ident
+        with ($($t:tt)*)
+        at ($temp:expr)
     ) => {
-        $crate::gen_gas_mix!(
-            with($($t)*)
-            at($temp)$unit
-            in(0.0) L
-        )
-    };    
-    (
-        with($($t:tt)*)
-        at($temp:expr) K
-        in($volume:expr) L
-    ) => {
-        GasMixture {
-            gases: $crate::gen_gas_vec!($($t)*),
-            temperature: $temp,
-            volume: $volume
+        gen_gas_mix_with_energy! {
+            with ($($t)*)
+            at ($temp)
+            in (0.0)
         }
     };
     (
-        with($($t:tt)*)
-        at($temp:expr) C
-        in($volume:expr) L
-    ) => {
-        gen_gas_mix! {
-            with($($t)*)
-            at($crate::constants::T0C + $temp) K
-            in($volume) L
-        }
-    };
-    (
-        with($($t:tt)*)
-        at($energy:expr) J
-        in($volume:expr) L
+        with ($($t:tt)*)
+        at ($energy:expr)
+        in ($volume:expr)
     ) => {
         $crate::GasMixture::with_energy(
             $crate::gen_gas_vec!($($t)*),
@@ -53,27 +31,54 @@ macro_rules! gen_gas_mix(
             $volume
         )
     };
-);
+}
+
+#[macro_export]
+macro_rules! gen_gas_mix_with_temp {
+    {
+        with ($($t:tt)*)
+        at ($temp:expr)
+    } => {
+        gen_gas_mix_with_temp! {
+            with ($($t)*)
+            at ($temp)
+            in (0.0)
+        }
+    };
+
+    {
+        with ($($t:tt)*)
+        at ($temp:expr)
+        in ($volume:expr)
+    } => {
+        GasMixture {
+            gases: $crate::gen_gas_vec!($($t)*),
+            temperature: $temp,
+            volume: $volume
+        }
+    };
+}
 
 #[macro_export]
 macro_rules! temperature {
-    ($temp:expr, Kelvin) => {
+    ($temp:expr, K) => {
         $temp
     };
-    ($temp:expr, Celcius) => {
-        temperature!($temp + $crate::constants::T0C, Kelvin)
+    ($temp:expr, C) => {
+        temperature!($temp + $crate::constants::T0C, K)
     };
 }
 
 #[macro_export]
 macro_rules! reaction {
-    (
+    {
         called ($name:ident)
-        with ( $($g:path => $ma:expr),+ )
-        at ($min_temp:expr)
+        with($($g:path => $ma:expr),+)
+        at($min_temp:expr)
         with_gm_as ($gm_name:ident) =>
         $code: tt
-    ) => {
+    } => {
+        #[inline]
         fn $name($gm_name: $crate::GasMixture) -> $crate::GasMixture {
             if (
                 $gm_name.temperature >= $min_temp &&
