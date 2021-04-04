@@ -8,6 +8,7 @@ edition = "2018"
 
 [dependencies]
 enum-map = "0.6.4"
+float-cmp = "0.8.0"
 
 [profile.release]
 debug = true

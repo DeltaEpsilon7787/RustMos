@@ -1,7 +1,7 @@
 extern crate enum_map;
 
-use crate::gas::*;
 use crate::constants as C;
+use crate::gas::*;
 use std::ops::{Add, Index};
 
 #[derive(Copy, Clone, Debug)]
@@ -48,11 +48,14 @@ impl GasMixture {
         Self {
             gases: self.gases + other.gases,
             temperature: (lhs_energy + rhs_energy) / (lhs_cap + rhs_cap),
-            volume: self.volume + other.volume
+            volume: self.volume + other.volume,
         }
     }
 
     pub fn with_energy(gases: GasVec, energy: f64, volume: f64) -> Self {
+        if gases.get_heat_cap() == 0.0 {
+            panic!("Null gas mixes may not have energy");
+        }
         Self {
             gases,
             temperature: energy / gases.get_heat_cap(),

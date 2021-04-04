@@ -70,9 +70,7 @@ impl GasVec {
     }
 
     pub fn get_total_amount(&self) -> f64 {
-        self.0
-            .values()
-            .sum()
+        self.0.values().sum()
     }
 }
 

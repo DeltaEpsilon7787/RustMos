@@ -1,22 +1,21 @@
 use tg_atmos_sim::*;
 
 fn main() {
-    let seed = (100_000..100_000_000).map(|i| {
-        gen_gas_mix_with_temp!(
-            with (
-                Gas::Pl => i as f64,
-                Gas::CO2 => i as f64,
-                Gas::O2 => i as f64 / 2.0,
-                Gas::H2 => i as f64,
-            )
-            at (i as f64)
-            in (1000.0)
+    let i = 6000194;
+    let output = gen_gas_mix_with_temp!(
+        with (
+            Gas::Pl => (3. * i as f64) % 1000.,
+            Gas::O2 => (5. * i as f64) % 1000.,
+            Gas::CO2 => (7. * i as f64) % 1000.,
+            Gas::H2 => (11. * i as f64) % 1000.,
+            Gas::N2 => (13. * i as f64) % 1000.,
+            Gas::N2O => (17. * i as f64) % 1000.,
+            Gas::BZ => (21. * i as f64) % 1000.,
         )
-    });
-
-    let output = seed.map(react).fold(0.0, |a, gm| {
-        a + gm.gases.0.values().sum::<f64>() + gm.temperature
-    });
+        at (i as f64)
+        in (1000.0)
+    );
 
     println!("{:?}", output);
+    println!("{:?}", react(output));
 }

@@ -2,6 +2,7 @@ pub mod constants;
 pub mod gas;
 pub mod gas_mixture;
 pub mod reactions;
+pub mod tests;
 
 pub mod macros;
 
