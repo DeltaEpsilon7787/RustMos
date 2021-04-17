@@ -1,6 +1,6 @@
 [package]
 name = "tg_atmos_sim"
-version = "0.1.0"
+version = "1.0.0"
 authors = ["Delta <editorrus2@gmail.com>"]
 edition = "2018"
 
@@ -9,6 +9,7 @@ edition = "2018"
 [dependencies]
 enum-map = "0.6.4"
 float-cmp = "0.8.0"
+libc = "0.2"
 
-[profile.release]
-debug = true
+[lib]
+crate-type=["cdylib"]

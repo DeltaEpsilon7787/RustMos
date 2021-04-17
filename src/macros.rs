@@ -5,25 +5,25 @@ macro_rules! gen_gas_vec {
             $($t)*
             _ => 0.0
         })
-    }
+    };
 }
 
 #[macro_export]
 macro_rules! gen_gas_mix_with_energy {
     (
-        with ($($t:tt)*)
-        at ($temp:expr)
+        with($($t:tt)*)
+        at($temp:expr)
     ) => {
         gen_gas_mix_with_energy! {
-            with ($($t)*)
-            at ($temp)
-            in (0.0)
+            with($($t)*)
+            at($temp)
+            in(0.0)
         }
     };
     (
-        with ($($t:tt)*)
-        at ($energy:expr)
-        in ($volume:expr)
+        with($($t:tt)*)
+        at($energy:expr)
+        in($volume:expr)
     ) => {
         $crate::GasMixture::with_energy(
             $crate::gen_gas_vec!($($t)*),
@@ -36,20 +36,20 @@ macro_rules! gen_gas_mix_with_energy {
 #[macro_export]
 macro_rules! gen_gas_mix_with_temp {
     {
-        with ($($t:tt)*)
-        at ($temp:expr)
+        with($($t:tt)*)
+        at($temp:expr)
     } => {
         gen_gas_mix_with_temp! {
-            with ($($t)*)
-            at ($temp)
-            in (0.0)
+            with($($t)*)
+            at($temp)
+            in(0.0)
         }
     };
 
     {
-        with ($($t:tt)*)
-        at ($temp:expr)
-        in ($volume:expr)
+        with($($t:tt)*)
+        at($temp:expr)
+        in($volume:expr)
     } => {
         GasMixture {
             gases: $crate::gen_gas_vec!($($t)*),
@@ -72,10 +72,10 @@ macro_rules! temperature {
 #[macro_export]
 macro_rules! reaction {
     {
-        called ($name:ident)
+        called($name:ident)
         with($($g:expr => $ma:expr),+)
         at($min_temp:expr)
-        with_gm_as ($gm_name:ident) =>
+        with_gm_as($gm_name:ident) =>
         $code: tt
     } => {
         #[inline]
@@ -113,12 +113,12 @@ macro_rules! chained_call {
 #[macro_export]
 macro_rules! test_reaction{
     (
-        named ($name:ident)
-        testing ($func:path)
-        init_with ($($gas0:path => $gas_amt0:expr),+)
-        init_at ($temp0:expr)
-        expect_with ($($t1:tt)*)
-        expect_at ($temp1:expr)
+        named($name:ident)
+        testing($func:path)
+        init_with($($gas0:path => $gas_amt0:expr),+)
+        init_at($temp0:expr)
+        expect_with($($t1:tt)*)
+        expect_at($temp1:expr)
     ) => {
         test_reaction!(
             named ($name)
@@ -133,11 +133,11 @@ macro_rules! test_reaction{
     (
         named ($name:ident)
         testing ($func:path)
-        init_with ($($gas0:path => $gas_amt0:expr),+)
-        init_at ($temp0:expr)
-        expect_with ($($gas1:path => $gas_amt1:expr),+)
-        expect_at ($temp1:expr)
-        in ($vol:expr)
+        init_with($($gas0:path => $gas_amt0:expr),+)
+        init_at($temp0:expr)
+        expect_with($($gas1:path => $gas_amt1:expr),+)
+        expect_at($temp1:expr)
+        in($vol:expr)
     ) => {
         #[test]
         fn $name() {

@@ -66,6 +66,18 @@ mod tests {
         );
     }
 
+    #[test]
+    #[should_panic]
+    fn energy_test_null_mix() {
+        gen_gas_mix_with_temp!(
+            with(
+                Gas::Pl => -50.0,
+                Gas::O2 => 50.0,
+            )
+            at(temperature!(2000.0, K))
+        );
+    }
+
     test_reaction!(
         named(n2o_decomp_test)
         testing(R::n2o_decomp)
@@ -291,7 +303,7 @@ mod tests {
 
     test_reaction!(
         named(random_react_test)
-        testing(R::react)
+        testing(R::react_once)
         init_with(
             Gas::N2 => 522.0,
             Gas::O2 => 970.0,

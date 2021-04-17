@@ -4,6 +4,7 @@ use enum_map as EM;
 use std::ops::{Add, Index, Mul};
 
 #[derive(Copy, Clone, Debug, EM::Enum)]
+#[repr(u8)]
 pub enum Gas {
     N2,
     O2,
@@ -18,6 +19,8 @@ pub enum Gas {
     ST,
     PlOx,
 }
+pub const GAS_AMT: usize = 12;
+
 impl Gas {
     fn heat_cap_of(self) -> f64 {
         match self {
@@ -49,9 +52,11 @@ impl Gas {
         }
     }
 }
+
+/// cbindgen:ignore
 pub type GasEnumMap = EM::EnumMap<Gas, f64>;
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct GasVec(pub GasEnumMap);
 
 impl GasVec {

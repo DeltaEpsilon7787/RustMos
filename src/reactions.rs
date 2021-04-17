@@ -1,5 +1,4 @@
 use crate::constants as C;
-#[allow(dead_code)]
 use crate::enum_map;
 use crate::gas::*;
 use crate::{
@@ -310,7 +309,7 @@ reaction! (
     }
 );
 
-pub fn react(gm: GasMixture) -> GasMixture {
+pub fn react_once(gm: GasMixture) -> GasMixture {
     if verify_hnob(&gm) {
         chained_call! (
             gm =>
@@ -326,4 +325,39 @@ pub fn react(gm: GasMixture) -> GasMixture {
     } else {
         gm
     }
+}
+
+pub fn react_several(gm: GasMixture, times: usize) -> Vec<GasMixture> {
+    let mut result = Vec::with_capacity(times);
+    let mut cur = gm;
+    for _ in 1..=times {
+        cur = react_once(cur);
+        result.push(cur);
+    }
+
+    result
+}
+
+pub fn react_until_done(gm: GasMixture) -> GasMixture {
+    let mut prev_gm = gm;
+    let mut next_gm = react_once(gm);
+
+    while prev_gm != next_gm {
+        prev_gm = next_gm;
+        next_gm = react_once(next_gm);
+    }
+
+    next_gm
+}
+
+pub fn react_each_once(gms: Vec<GasMixture>) -> Vec<GasMixture> {
+    gms.iter().map(|gm| react_once(*gm)).collect()
+}
+
+pub fn react_each_several(gms: Vec<GasMixture>, times: usize) -> Vec<Vec<GasMixture>> {
+    gms.iter().map(|gm| react_several(*gm, times)).collect()
+}
+
+pub fn react_each_until_done(gms: Vec<GasMixture>) -> Vec<GasMixture> {
+    gms.iter().map(|gm| react_until_done(*gm)).collect()
 }

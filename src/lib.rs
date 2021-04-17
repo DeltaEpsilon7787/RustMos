@@ -9,5 +9,6 @@ pub mod macros;
 pub use crate::gas::Gas;
 pub use crate::gas::GasVec;
 pub use crate::gas_mixture::GasMixture;
-pub use crate::reactions::react;
 pub use enum_map::enum_map;
+
+pub mod ffi;

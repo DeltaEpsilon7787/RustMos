@@ -1,10 +1,10 @@
 extern crate enum_map;
 
-use crate::constants as C;
+use crate::{constants as C, gen_gas_vec};
 use crate::gas::*;
-use std::ops::{Add, Index};
+use std::{ops::{Add, Index}};
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct GasMixture {
     pub gases: GasVec,
     pub temperature: f64,
@@ -33,6 +33,10 @@ impl GasMixture {
     }
 
     pub fn adjust_thermal_energy(&self, energy: f64) -> Self {
+        if self.get_heat_cap() == 0.0 {
+            panic!("Null gas mixes may not have energy");
+        }
+
         Self {
             temperature: (self.get_energy() + energy) / self.get_heat_cap(),
             ..*self
@@ -56,10 +60,19 @@ impl GasMixture {
         if gases.get_heat_cap() == 0.0 {
             panic!("Null gas mixes may not have energy");
         }
+
         Self {
             gases,
             temperature: energy / gases.get_heat_cap(),
             volume,
+        }
+    }
+
+    pub fn zero() -> Self {
+        GasMixture {
+            gases: gen_gas_vec!(),
+            temperature: 0.0,
+            volume: 0.0
         }
     }
 }
@@ -69,6 +82,14 @@ impl Add<GasMixture> for GasMixture {
 
     fn add(self, rhs: GasMixture) -> Self {
         self.mix_with(&rhs)
+    }
+}
+
+impl Add<f64> for GasMixture {
+    type Output = Self;
+
+    fn add(self, rhs: f64) -> Self {
+        self.adjust_thermal_energy(rhs)
     }
 }
 
