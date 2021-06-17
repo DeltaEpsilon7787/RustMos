@@ -121,16 +121,22 @@ reaction! (
     )
     at(temperature!(C::FUSION_TEMPERATURE_THRESHOLD, K))
     with_gm_as(gm) => {
-        let pl = gm[Gas::Pl];
-        let co2 = gm[Gas::CO2];
         let e = gm.get_energy();
-        let v = gm.volume;
+        let pl = gm.gases[Gas::Pl];
+        let co2 = gm.gases[Gas::CO2];
 
-        let scale_factor = gm.volume / C::ATMOS_PI;
+        let scale_factor = (gm.volume / C::FUSION_SCALE_DIVISOR).max(C::FUSION_MINIMAL_SCALE);
+        let temp_scale = gm.temperature.log10();
 
-        let toroidal_size = 2. * C::ATMOS_PI + ((v - C::TOROID_VOLUME_BREAKEVEN) / C::TOROID_VOLUME_BREAKEVEN).atan();
-
-        let instability = atmos_mod((gm.get_fusion_power() * C::INSTABILITY_GAS_POWER_FACTOR).powi(2), toroidal_size);
+        let toroidal_size = C::TOROID_CALCULATED_THRESHOLD + {
+            if temp_scale <= C::FUSION_BASE_TEMPSCALE {
+                (temp_scale - C::FUSION_BASE_TEMPSCALE) / C::FUSION_BUFFER_DIVISOR
+            } else {
+                (4_f64).powf(temp_scale - C::FUSION_BASE_TEMPSCALE) / C::FUSION_SLOPE_DIVISOR
+            }
+        };
+        let gas_power = gm.get_fusion_power();
+        let instability = atmos_mod(gas_power * C::INSTABILITY_GAS_POWER_FACTOR, toroidal_size);
 
         let scaled_plasma = (pl - C::FUSION_MOLE_THRESHOLD) / scale_factor;
         let scaled_carbon = (co2 - C::FUSION_MOLE_THRESHOLD) / scale_factor;
@@ -138,51 +144,60 @@ reaction! (
         let plasma_mod = atmos_mod(scaled_plasma - instability * scaled_carbon.sin(), toroidal_size);
         let carbon_mod = atmos_mod(scaled_carbon - plasma_mod, toroidal_size);
 
-        let delta_plasma = plasma_mod * scale_factor + C::FUSION_MOLE_THRESHOLD - pl;
-        let delta_carbon = carbon_mod * scale_factor + C::FUSION_MOLE_THRESHOLD - co2;
+        let new_pl = plasma_mod * scale_factor + C::FUSION_MOLE_THRESHOLD;
+        let new_co2 = carbon_mod * scale_factor + C::FUSION_MOLE_THRESHOLD;
 
-        let reaction_energy = -delta_plasma * C::PLASMA_BINDING_ENERGY;
+        let delta_plasma = new_pl - pl;
+        let delta_carbon = new_co2 - co2;
 
-        let is_suppressed_endo = instability < C::FUSION_INSTABILITY_ENDOTHERMALITY && reaction_energy < 0.;
+        let active_plasma = (pl - new_pl).min(toroidal_size * scale_factor * 1.5);
 
         let reaction_energy = {
-            if instability < C::FUSION_INSTABILITY_ENDOTHERMALITY {
-                reaction_energy.max(0.)
-            } else if reaction_energy < 0. {
-                reaction_energy * (instability - C::FUSION_INSTABILITY_ENDOTHERMALITY).sqrt()
+            if instability <= C::FUSION_INSTABILITY_ENDOTHERMALITY || active_plasma > 0.0 {
+                (active_plasma * C::PLASMA_BINDING_ENERGY).max(0.0)
             } else {
-                reaction_energy
+                active_plasma * C::PLASMA_BINDING_ENERGY * (instability - C::FUSION_INSTABILITY_ENDOTHERMALITY).sqrt()
             }
         };
 
-        let product_release = C::FUSION_TRITIUM_MOLES_USED * reaction_energy * C::FUSION_TRITIUM_CONVERSION_COEFFICIENT;
-        let is_exothermic = reaction_energy > 0.;
+        let new_e = {
+            if reaction_energy != 0.0 {
+                let middle_energy = {
+                    let alpha = C::FUSION_MOLE_THRESHOLD + C::TOROID_CALCULATED_THRESHOLD * scale_factor / 2.;
+                    let beta = 200. * C::FUSION_MIDDLE_ENERGY_REFERENCE;
 
-        let gas_vec_out = GasVec (enum_map! {
-            Gas::O2 if is_exothermic => product_release,
-            Gas::N2O if is_exothermic => product_release,
-            Gas::BZ if !is_exothermic => -product_release,
-            Gas::NO2 if !is_exothermic => -product_release,
-            Gas::Pl => delta_plasma.max(-pl),
-            Gas::CO2 => delta_carbon.max(-co2),
-            Gas::H2 => -C::FUSION_TRITIUM_MOLES_USED,
-            _ => 0.0
-        });
-
-        let zero_mix = GasMixture {
-            gases: gas_vec_out,
-            temperature: gm.temperature,
-            volume: 0.
+                    alpha * beta
+                };
+                let e_alpha = middle_energy * C::FUSION_ENERGY_TRANSLATION_EXPONENT.powf((e / middle_energy).log10());
+                let bowdlerized = reaction_energy
+                    .min(e_alpha * (C::FUSION_ENERGY_TRANSLATION_EXPONENT.powi(2) - 1.))
+                    .max(e_alpha * (C::FUSION_ENERGY_TRANSLATION_EXPONENT.powi(-2) - 1.));
+                middle_energy * 10_f64.powf(((e_alpha + bowdlerized) / middle_energy).log(C::FUSION_ENERGY_TRANSLATION_EXPONENT))
+            } else {
+                e
+            }
         };
 
-        let delta_mix = GasMixture::with_energy(gas_vec_out, reaction_energy, 0.);
+        let released_energy = new_e - e;
 
-        if is_suppressed_endo {
-            gm + zero_mix
-        } else if e + reaction_energy < 0. {
-            gm
-        } else {
+        let waste_out = scale_factor * C::FUSION_TRITIUM_CONVERSION_COEFFICIENT * C::FUSION_TRITIUM_MOLES_USED;
+
+        let delta_mix = gen_gas_mix_with_energy!(
+            with(
+                Gas::Pl => delta_plasma.max(-pl),
+                Gas::CO2 => delta_carbon.max(-co2),
+                Gas::H2 => -C::FUSION_TRITIUM_MOLES_USED,
+                Gas::H2O if active_plasma > 0. => waste_out,
+                Gas::BZ if active_plasma <= 0. => waste_out,
+                Gas::O2 => waste_out,
+            )
+            at(released_energy)
+        );
+
+        if reaction_energy != 0.0 || instability <= C::FUSION_INSTABILITY_ENDOTHERMALITY {
             gm + delta_mix
+        } else {
+            gm
         }
     }
 );
